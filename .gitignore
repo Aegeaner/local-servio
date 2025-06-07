@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.python-version
+pyproject.toml
+poetry.lock
+
+# Environments
+.venv/
+venv/
+env/
+
+# Static files (ignore contents but keep directory)
+static/*
+static/**/*
+!static/.gitkeep

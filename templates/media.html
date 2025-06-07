@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ filename }} - Media Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .media-container {
+            margin-top: 20px;
+            width: 100%;
+        }
+        video, audio {
+            width: 100%;
+            margin-top: 15px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>{{ filename }}</h1>
+        <div class="media-container">
+            {% if filename.endswith('.mp4') %}
+                <video controls>
+                    <source src="{{ url_for('static', filename=filepath) }}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            {% elif filename.endswith('.wav') %}
+                <audio controls>
+                    <source src="{{ url_for('static', filename=filepath) }}" type="audio/wav">
+                    Your browser does not support the audio element.
+                </audio>
+            {% else %}
+                <p>Unsupported media format</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>

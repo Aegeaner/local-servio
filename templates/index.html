@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Local Content Server</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin-bottom: 30px; }
+        ul { list-style-type: none; padding: 0; }
+        li { margin: 5px 0; }
+        a { text-decoration: none; color: #0066cc; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <h1>Local Content Server</h1>
+    
+    <div class="section">
+        <h2>Media Files</h2>
+        <ul>
+            {% for file in media_files %}
+                <li><a href="{{ url_for('media_view', filename=file) }}">{{ file | e }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+    
+    <div class="section">
+        <h2>Markdown Documents</h2>
+        {% set grouped_files = {} %}
+        {% for file in markdown_files %}
+            {% set parts = file.split('/') %}
+            {% if parts|length > 1 %}
+                {% set dir = parts[0] %}
+            {% else %}
+                {% set dir = 'Root Directory' %}
+            {% endif %}
+            {% if dir not in grouped_files %}
+                {% set _ = grouped_files.update({dir: []}) %}
+            {% endif %}
+            {% set _ = grouped_files[dir].append(file) %}
+        {% endfor %}
+        
+        {% for dir, files in grouped_files.items() %}
+            <h3>{{ dir }}</h3>
+            <ul>
+                {% for file in files %}
+                    {% set filename = file.split('/')[-1] %}
+                    <li><a href="{{ url_for('render_markdown', filename=file) }}">{{ filename | e }}</a></li>
+                {% endfor %}
+            </ul>
+        {% endfor %}
+    </div>
+</body>
+</html>
