@@ -16,11 +16,41 @@
     
     <div class="section">
         <h2>Media Files</h2>
-        <ul>
+            {% set grouped_files = {} %}
             {% for file in media_files %}
-                <li><a href="{{ url_for('media_view', filename=file) }}">{{ file | e }}</a></li>
+                {% set parts = file.split('/') %}
+                {% if parts|length > 1 %}
+                    {% set dir = parts | join('/') %}
+                {% else %}
+                    {% set dir = 'Root Directory' %}
+                {% endif %}
+                {% if dir not in grouped_files %}
+                    {% set _ = grouped_files.update({dir: []}) %}
+                {% endif %}
+                {% set _ = grouped_files[dir].append(file) %}
             {% endfor %}
-        </ul>
+
+            {% set unique_display_dirs = [] %}
+            {% for dir in grouped_files.keys() %}
+                {% set display_dir = dir.split('/')[:2] | join('/') %}
+                {% if display_dir not in unique_display_dirs %}
+                    {% set _ = unique_display_dirs.append(display_dir) %}
+                {% endif %}
+            {% endfor %}
+
+            {% for display_dir in unique_display_dirs %}
+                <h3>{{ display_dir }}</h3>
+                <ul>
+                    {% for original_dir, files_in_dir in grouped_files.items() %}
+                        {% if (original_dir.split('/')[:2] | join('/')) == display_dir %}
+                            {% for file in files_in_dir %}
+                                {% set filename = file.split('/')[-1] %}
+                                <li><a href="{{ url_for('media_view', filename=file) }}">{{ filename | e }}</a></li>
+                            {% endfor %}
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            {% endfor %}
     </div>
     
     <div class="section">
