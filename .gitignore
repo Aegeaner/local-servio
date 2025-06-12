@@ -4,7 +4,6 @@ __pycache__/
 *.pyo
 *.pyd
 .python-version
-pyproject.toml
 poetry.lock
 
 # Environments

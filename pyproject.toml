@@ -1,0 +1,16 @@
+[project]
+name = "local-content-server"
+version = "0.1.0"
+description = "局域网内容服务网站，支持流媒体、Markdown渲染和低延迟WebTransport音视频"
+authors = [
+    { name = "Your Name", email = "your.email@example.com" }
+]
+requires-python = ">=3.9"
+dependencies = [
+    "flask>=3.1",
+    "markdown>=3.5",
+]
+
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel", "poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
