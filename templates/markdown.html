@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>{{ filename }} - Markdown Viewer</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css">
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
         .content { max-width: 800px; margin: 0 auto; }
@@ -12,6 +13,21 @@
     <div class="content">
         {{ content|safe }}
     </div>
-    {{ mathjax|safe }}
+    <script>
+        function renderMath() {
+            renderMathInElement(document.body, {
+                delimiters: [
+                    {left: "$$", right: "$$", display: true},
+                    {left: "\\[", right: "\\]", display: true},
+                    {left: "$", right: "$", display: false},
+                    {left: "\\(", right: "\\)", display: false}
+                ]
+            });
+        }
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex/dist/contrib/auto-render.min.js"
+            onload="renderMath()">
+    </script>
 </body>
 </html>
