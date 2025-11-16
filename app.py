@@ -21,13 +21,17 @@ def get_files(directory, extensions=None):
     for root, dirs, filenames in os.walk(directory):
         dirs.sort(reverse=True)
         dirs[:] = dirs[:HISTORY_RETENTION]
+        cur_files = []
         for filename in filenames:
             # 根据扩展名列表过滤文件
             if extensions:
                 if not any(filename.endswith(ext) for ext in extensions):
                     continue
             rel_path = os.path.relpath(os.path.join(root, filename), directory)
-            files.append(rel_path)
+            cur_files.append(rel_path)
+        if extensions == [".md"]:
+            cur_files.sort(key=lambda path: os.path.basename(path).split('_')[0])
+        files.extend(cur_files)
     return files
 
 
