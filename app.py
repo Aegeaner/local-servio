@@ -184,7 +184,7 @@ def render_markdown(filename):
 
 
     # 配置Markdown扩展 (不再需要 MathProtectExtension)
-    extensions = [] # Temporarily removed for debugging
+    extensions = [ExtraExtension()]
 
     # 转换为HTML
     md = markdown.Markdown(extensions=extensions)
