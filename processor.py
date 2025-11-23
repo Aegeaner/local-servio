@@ -35,8 +35,9 @@ class MathPostprocessor:
         # Use re.sub to allow for flexible matching of placeholders (e.g., with extra spaces)
         for i, block in enumerate(self.math_blocks):
             # Match the placeholder with optional leading/trailing whitespace
-            placeholder_pattern = re.compile(r'\\s*@@MATH_BLOCK_{}\\s*' .format(i))
-            text = placeholder_pattern.sub(block, text)
+            placeholder_pattern = re.compile(r'@{{2}}MATH_BLOCK_{}[@]{{2}}'.format(i))
+            # Use a replacement function to ensure the block is inserted literally and wrapped with Jinja2 raw tags
+            text = placeholder_pattern.sub(lambda m, b=block: f"{{% raw %}}{b}{{% endraw %}}" if b.strip() else "", text)
         return text
 
 

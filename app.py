@@ -184,12 +184,7 @@ def render_markdown(filename):
 
 
     # 配置Markdown扩展 (不再需要 MathProtectExtension)
-    extensions = [
-        ExtraExtension(),
-        CodeHiliteExtension(),
-        TocExtension(title="Table of Contents"),
-        "markdown.extensions.tables",
-    ]
+    extensions = [] # Temporarily removed for debugging
 
     # 转换为HTML
     md = markdown.Markdown(extensions=extensions)
@@ -199,6 +194,9 @@ def render_markdown(filename):
     # Step 4: 运行 MathPostprocessor 恢复数学公式
     math_postprocessor = MathPostprocessor(math_preprocessor.math_blocks)
     final_html_content = math_postprocessor.run(html_content)
+
+    # Final cleanup: Remove any remaining '@@' not part of a math block placeholder
+    final_html_content = re.sub(r'@@(?!MATH_BLOCK_\\d+)', '', final_html_content)
 
     return render_template("markdown.html", content=final_html_content, filename=filename)
 
