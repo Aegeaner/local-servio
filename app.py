@@ -4,7 +4,7 @@ import markdown
 from markdown.extensions.extra import ExtraExtension
 from markdown.extensions.codehilite import CodeHiliteExtension
 from markdown.extensions.toc import TocExtension
-from processor import MathProtectExtension
+from processor import MathPreprocessor, MathPostprocessor
 import urllib.parse
 import mdformat
 import re
@@ -170,18 +170,23 @@ def render_markdown(filename):
     with open(filepath, "r", encoding="utf-8") as f:
         md_content = f.read()
 
-    # 使用 mdformat 格式化 Markdown 内容
-    # mdformat 会自动修复许多格式问题，包括列表格式。
-    formatted_md_content = mdformat.text(md_content, extensions={'gfm'})
+    # Step 1: 运行 MathPreprocessor 保护数学公式
+    math_preprocessor = MathPreprocessor()
+    md_content_protected = '\n'.join(math_preprocessor.run(md_content.split('\n')))
 
-    # 后处理：移除 mdformat 引入的、破坏有序列表编号的空行
+
+    # Step 2: 使用 mdformat 格式化 Markdown 内容 (在公式保护之后运行)
+    formatted_md_content = mdformat.text(md_content_protected, extensions={'gfm'})
+
+
+    # Step 3: 后处理：移除 mdformat 引入的、破坏有序列表编号的空行
     final_md_content = remove_mdformat_list_blank_lines(formatted_md_content)
 
-    # 配置Markdown扩展
+
+    # 配置Markdown扩展 (不再需要 MathProtectExtension)
     extensions = [
         ExtraExtension(),
         CodeHiliteExtension(),
-        MathProtectExtension(),
         TocExtension(title="Table of Contents"),
         "markdown.extensions.tables",
     ]
@@ -190,7 +195,12 @@ def render_markdown(filename):
     md = markdown.Markdown(extensions=extensions)
     html_content = md.convert(final_md_content)
 
-    return render_template("markdown.html", content=html_content, filename=filename)
+
+    # Step 4: 运行 MathPostprocessor 恢复数学公式
+    math_postprocessor = MathPostprocessor(math_preprocessor.math_blocks)
+    final_html_content = math_postprocessor.run(html_content)
+
+    return render_template("markdown.html", content=final_html_content, filename=filename)
 
 
 if __name__ == "__main__":

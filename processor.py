@@ -5,11 +5,14 @@ from markdown.postprocessors import Postprocessor
 
 
 class MathPreprocessor(Preprocessor):
+    # A more robust regex for LaTeX math blocks.
+    # Now includes patterns for inline $...$ (single and double $$), and \[...\] / \(...).
+    # Also attempts to capture standalone LaTeX commands (like \Sigma, \mod) as math.
     MATH_BLOCK_REGEX = re.compile(
-        r"(\$\$.*?\$\$|\$[^$\n]+?\$|\\\\[.*?\\\\]|\\\(.*?\\\\\))", re.DOTALL
+        r"(\\[(?:equation|align|gather|split|multline)\][\\s\\S]*?\\\[(?:equation|align|gather|split|multline)\]|\\[\\(.*?\\)\\]|\\\\.*?\\\\|$$\\$.*?$$\\$\\|$$[^\\n]*?$$|\\\\[a-zA-Z]+\\\\)", re.DOTALL
     )
 
-    def __init__(self, md):
+    def __init__(self, md=None): # md can be None as we run it manually
         super().__init__(md)
         self.math_blocks = []
 
@@ -24,14 +27,16 @@ class MathPreprocessor(Preprocessor):
         return text.split("\n")
 
 
-class MathPostprocessor(Postprocessor):
+class MathPostprocessor:
     def __init__(self, math_blocks):
-        super().__init__()
         self.math_blocks = math_blocks
 
     def run(self, text):
+        # Use re.sub to allow for flexible matching of placeholders (e.g., with extra spaces)
         for i, block in enumerate(self.math_blocks):
-            text = text.replace(f"@@MATH_BLOCK_{i}@@", block)
+            # Match the placeholder with optional leading/trailing whitespace
+            placeholder_pattern = re.compile(r'\\s*@@MATH_BLOCK_{}\\s*' .format(i))
+            text = placeholder_pattern.sub(block, text)
         return text
 
 
@@ -55,17 +60,17 @@ class ListFixPreprocessor(Preprocessor):
     by inserting a blank line between the ordered list item content and the nested unordered list,
     while maintaining correct indentation.
     """
-    LIST_ITEM_SEPARATOR_REGEX = re.compile(r"\s-\s") # Matches ' - '
+    LIST_ITEM_SEPARATOR_REGEX = re.compile(r" \s-\s ") # Matches ' - '
 
     def run(self, lines):
         new_lines = []
         for line in lines:
-            original_indent = re.match(r"^\s*", line).group(0)
+            original_indent = re.match(r"^\\s*", line).group(0)
             content_without_indent = line[len(original_indent):]
 
             # Case 1: Line content starts with a hyphen immediately followed by a non-whitespace character
             # e.g., "  -Item" -> "  - Item"
-            if re.match(r"^-(\S)", content_without_indent):
+            if re.match(r"^-(\\S)", content_without_indent):
                 fixed_content = "- " + content_without_indent[1:]
                 new_lines.append(original_indent + fixed_content)
                 continue
@@ -79,7 +84,7 @@ class ListFixPreprocessor(Preprocessor):
                 parts = self.LIST_ITEM_SEPARATOR_REGEX.split(content_without_indent)
 
                 # Check if the first part is an ordered list item
-                ordered_list_match = re.match(r"^(\d+\.)\s*(.*)", parts[0].strip())
+                ordered_list_match = re.match(r"^(\\d+\\.)\\s*(.*)", parts[0].strip())
                 
                 if ordered_list_match:
                     # If it's an ordered list item, keep its original prefix and content
