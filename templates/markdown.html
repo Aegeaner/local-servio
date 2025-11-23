@@ -2,21 +2,94 @@
 <html>
 <head>
     <title>{{ filename }} - Markdown Viewer</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.css">
+    
+    <!-- MathJax Configuration - Complete and Working -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                processEscapes: true,
+                tags: 'ams'
+            },
+            options: {
+                skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+                ignoreHtmlClass: 'tex2jax_ignore',
+                processHtmlClass: 'tex2jax_process'
+            },
+            startup: {
+                pageReady: function() {
+                    return MathJax.startup.defaultPageReady();
+                }
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+    
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .content { max-width: 800px; margin: 0 auto; }
-        ul {
-            list-style-type: disc; /* Ensure default bullet points */
-            padding-left: 20px; /* Add padding for indentation */
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            line-height: 1.6;
         }
-        li {
-            margin-bottom: 5px; /* Add some space between list items */
+        .content { 
+            max-width: 800px; 
+            margin: 0 auto; 
         }
+        
+        /* Base list styling */
+        .content ul, .content ol {
+            margin: 0.5em 0;
+            padding-left: 1.5em;
+        }
+        
+        .content ul {
+            list-style-type: disc;
+        }
+        
+        .content ol {
+            list-style-type: decimal;
+        }
+        
+        /* Nested list styling - recursive indentation */
+        .content ul ul, .content ol ol, .content ul ol, .content ol ul {
+            padding-left: 2.0em;
+        }
+        
+        .content ul ul ul, .content ol ol ol, .content ul ul ol, .content ul ol ul,
+        .content ol ul ul, .content ol ol ul, .content ul ol ol, .content ol ul ol {
+            padding-left: 2.5em;
+        }
+        
+        .content li {
+            margin: 0.25em 0;
+            line-height: 1.4;
+        }
+        
+        /* Ensure nested lists within list items are properly spaced */
+        .content li > ul, .content li > ol {
+            margin-top: 0.25em;
+            margin-bottom: 0.25em;
+        }
+        
+        /* Code styling */
+        .content code {
+            background: #f4f4f4;
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9em;
+        }
+        
+        .content pre code {
+            background: none;
+            padding: 0;
+        }
+        
         table {
             border-collapse: collapse;
             width: 100%;
-            margin-bottom: 20px;
+            margin: 1em 0;
         }
         th, td {
             border: 1px solid #ddd;
@@ -26,6 +99,28 @@
         th {
             background-color: #f2f2f2;
         }
+        
+        /* MathJax element styling */
+        mjx-container {
+            display: inline-block;
+            line-height: 0;
+        }
+        
+        mjx-container[jax="CHTML"][display="true"] {
+            display: block;
+            text-align: center;
+            margin: 1em 0;
+        }
+        
+        hr {
+            border: none;
+            border-top: 1px solid #ddd;
+            margin: 2em 0;
+        }
+        
+        strong {
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -33,21 +128,5 @@
     <div class="content">
         {{ content|safe }}
     </div>
-    <script>
-        function renderMath() {
-            renderMathInElement(document.body, {
-                delimiters: [
-                    {left: "$$", right: "$$", display: true},
-                    {left: "\\[", right: "\\]", display: true},
-                    {left: "$", right: "$", display: false},
-                    {left: "\\(", right: "\\)", display: false}
-                ]
-            });
-        }
-    </script>
-    <script defer src="https://cdn.jsdelivr.net/npm/katex/dist/katex.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/katex/dist/contrib/auto-render.min.js"
-            onload="renderMath()">
-    </script>
 </body>
 </html>

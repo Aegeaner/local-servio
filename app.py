@@ -2,9 +2,6 @@ from flask import Flask, render_template, send_from_directory, abort
 import os
 import markdown
 from markdown.extensions.extra import ExtraExtension
-from markdown.extensions.codehilite import CodeHiliteExtension
-from markdown.extensions.toc import TocExtension
-from processor import MathPreprocessor, MathPostprocessor
 import urllib.parse
 import mdformat
 import re
@@ -87,6 +84,30 @@ def media_view(filename):
     )
 
 
+def convert_math_delimiters(markdown_content: str) -> str:
+    """
+    Convert non-standard math delimiters [ ... ] to standard LaTeX delimiters \\[ ... \\]
+    for proper MathJax rendering.
+    """
+    # Pattern to match [ math content ] where math content doesn't contain unescaped brackets
+    # This handles both inline and display math using square brackets
+    pattern = r'\[\s*(.*?)\s*\]'
+    
+    def replace_math(match):
+        math_content = match.group(1).strip()
+        # Check if this looks like a mathematical expression
+        # (contains LaTeX commands, operators, etc.)
+        if any(char in math_content for char in ['\\', '^', '_', '{', '}', '=', '<', '>', '+', '-', '*', '/']):
+            return f'\\[ {math_content} \\]'
+        else:
+            # Not a math expression, keep original
+            return match.group(0)
+    
+    # Apply the conversion
+    converted_content = re.sub(pattern, replace_math, markdown_content, flags=re.DOTALL)
+    return converted_content
+
+
 def remove_mdformat_list_blank_lines(markdown_content: str) -> str:
     """
     Removes blank lines introduced by mdformat that break ordered list numbering 
@@ -103,7 +124,7 @@ def remove_mdformat_list_blank_lines(markdown_content: str) -> str:
     current_ol_marker_len = 0 # e.g., for '1. ', this is 3
 
     for line_idx, line in enumerate(lines):
-        original_indent_match = re.match(r'^\\s*', line)
+        original_indent_match = re.match(r'^\s*', line)
         original_indent_len = len(original_indent_match.group(0)) if original_indent_match else 0
         content = line.lstrip()
 
@@ -149,6 +170,8 @@ def remove_mdformat_list_blank_lines(markdown_content: str) -> str:
     return '\n'.join(new_lines)
 
 
+
+
 @app.route("/markdown/<path:filename>")
 def render_markdown(filename):
     """渲染Markdown文件并支持LaTeX公式"""
@@ -170,35 +193,23 @@ def render_markdown(filename):
     with open(filepath, "r", encoding="utf-8") as f:
         md_content = f.read()
 
-    # Step 1: 运行 MathPreprocessor 保护数学公式
-    math_preprocessor = MathPreprocessor()
-    md_content_protected = '\n'.join(math_preprocessor.run(md_content.split('\n')))
+    # Step 1: 转换数学公式分隔符 [ ... ] 为 \[ ... \]
+    md_content = convert_math_delimiters(md_content)
 
-
-    # Step 2: 使用 mdformat 格式化 Markdown 内容 (在公式保护之后运行)
-    formatted_md_content = mdformat.text(md_content_protected, extensions={'gfm'})
-
+    # Step 2: 使用 mdformat 格式化 Markdown 内容
+    formatted_md_content = mdformat.text(md_content, extensions={'gfm'})
 
     # Step 3: 后处理：移除 mdformat 引入的、破坏有序列表编号的空行
     final_md_content = remove_mdformat_list_blank_lines(formatted_md_content)
 
-
-    # 配置Markdown扩展 (不再需要 MathProtectExtension)
+    # 配置Markdown扩展
     extensions = [ExtraExtension()]
 
     # 转换为HTML
     md = markdown.Markdown(extensions=extensions)
     html_content = md.convert(final_md_content)
 
-
-    # Step 4: 运行 MathPostprocessor 恢复数学公式
-    math_postprocessor = MathPostprocessor(math_preprocessor.math_blocks)
-    final_html_content = math_postprocessor.run(html_content)
-
-    # Final cleanup: Remove any remaining '@@' not part of a math block placeholder
-    final_html_content = re.sub(r'@@(?!MATH_BLOCK_\\d+)', '', final_html_content)
-
-    return render_template("markdown.html", content=final_html_content, filename=filename)
+    return render_template("markdown.html", content=html_content, filename=filename)
 
 
 if __name__ == "__main__":
