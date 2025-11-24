@@ -7,8 +7,8 @@
     <script>
         window.MathJax = {
             tex: {
-                inlineMath: [['$', '$']],
-                displayMath: [['$$', '$$'], ['\\[', '\\]']],
+                inlineMath: [['$', '$'], ['(', ')']], // Added '(' ')' for compatibility with non-standard inline math
+                displayMath: [['$$', '$$'], ['\\[', '\\]'], ['[', ']']], // Added '[' ']' for compatibility with non-standard display math, use with caution due to potential ambiguity
                 processEscapes: true,
                 tags: 'ams'
             },
@@ -51,15 +51,7 @@
             list-style-type: decimal;
         }
         
-        /* Nested list styling - recursive indentation */
-        .content ul ul, .content ol ol, .content ul ol, .content ol ul {
-            padding-left: 2.0em;
-        }
-        
-        .content ul ul ul, .content ol ol ol, .content ul ul ol, .content ul ol ul,
-        .content ol ul ul, .content ol ol ul, .content ul ol ol, .content ol ul ol {
-            padding-left: 2.5em;
-        }
+
         
         .content li {
             margin: 0.25em 0;
@@ -67,9 +59,11 @@
         }
         
         /* Ensure nested lists within list items are properly spaced */
-        .content li > ul, .content li > ol {
+        .content li > ul,
+        .content li > ol {
             margin-top: 0.25em;
             margin-bottom: 0.25em;
+            padding-left: 1.5em; /* Recursive indentation for nested lists */
         }
         
         /* Code styling */

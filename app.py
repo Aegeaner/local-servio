@@ -108,70 +108,6 @@ def convert_math_delimiters(markdown_content: str) -> str:
     return converted_content
 
 
-def remove_mdformat_list_blank_lines(markdown_content: str) -> str:
-    """
-    Removes blank lines introduced by mdformat that break ordered list numbering 
-    when an unordered list is nested directly within an ordered list item.
-    This function now uses a stateful, line-by-line approach to correctly identify
-    and reformat nested lists.
-    """
-    new_lines = []
-    lines = markdown_content.split('\n')
-    
-    # State variables
-    in_ordered_list_item = False
-    current_ol_indent = 0
-    current_ol_marker_len = 0 # e.g., for '1. ', this is 3
-
-    for line_idx, line in enumerate(lines):
-        original_indent_match = re.match(r'^\s*', line)
-        original_indent_len = len(original_indent_match.group(0)) if original_indent_match else 0
-        content = line.lstrip()
-
-        # Try to match an ordered list item (e.g., '1. Text')
-        ol_match = re.match(r'^([0-9]+\.[ \t]+)(.*)', content)
-
-        if ol_match:
-            # Found an ordered list item
-            in_ordered_list_item = True
-            current_ol_indent = original_indent_len
-            current_ol_marker_len = len(ol_match.group(1)) # e.g., '1. ' is 3 chars
-            new_lines.append(line)
-        elif in_ordered_list_item and not content.strip():
-            # This is a blank line directly after an ordered list item. We skip it.
-            # mdformat often inserts these, breaking nesting.
-            continue
-        elif in_ordered_list_item and (content.startswith('-') or content.startswith('*')):
-            # This is a potential nested unordered list item.
-            # We need to apply the correct indentation.
-            # Required indent for nested UL = current_ol_indent + current_ol_marker_len + 4 spaces.
-            # E.g., if OL is at column 0 ('1. '), then content starts at column 3. Nested UL needs 3+4=7 spaces.
-            required_nested_indent_len = current_ol_indent + current_ol_marker_len + 4
-            
-            # Get the actual content of the unordered list item (without its current marker and indent)
-            ul_item_match = re.match(r'^[-*+][ \t]+(.*)', content)
-            if ul_item_match:
-                ul_content = ul_item_match.group(1)
-                # Reconstruct the line with the correct indentation
-                corrected_line = ' ' * required_nested_indent_len + '- ' + ul_content
-                new_lines.append(corrected_line)
-            else:
-                # Fallback if somehow a malformed UL item, just append original
-                new_lines.append(line)
-        else:
-            # Not an OL item, not a blank line after OL, not a nested UL item.
-            # Reset state if it's not a continuation of an OL.
-            # We need to be careful not to reset if it's a continuation paragraph of the OL item itself.
-            # A heuristic: if it's indented more than the OL, it might be a continuation.
-            if not ol_match and original_indent_len <= current_ol_indent:
-                in_ordered_list_item = False # Reset if not an OL item and not indented as a continuation
-            new_lines.append(line)
-            
-    return '\n'.join(new_lines)
-
-
-
-
 @app.route("/markdown/<path:filename>")
 def render_markdown(filename):
     """渲染Markdown文件并支持LaTeX公式"""
@@ -199,11 +135,11 @@ def render_markdown(filename):
     # Step 2: 使用 mdformat 格式化 Markdown 内容
     formatted_md_content = mdformat.text(md_content, extensions={'gfm'})
 
-    # Step 3: 后处理：移除 mdformat 引入的、破坏有序列表编号的空行
-    final_md_content = remove_mdformat_list_blank_lines(formatted_md_content)
+    # Step 3: Use the mdformat output directly.
+    final_md_content = formatted_md_content
 
     # 配置Markdown扩展
-    extensions = [ExtraExtension()]
+    extensions = [ExtraExtension(), 'markdown.extensions.nl2br', 'markdown.extensions.tables']
 
     # 转换为HTML
     md = markdown.Markdown(extensions=extensions)
