@@ -130,13 +130,7 @@ def render_markdown(filename):
         md_content = f.read()
 
     # Step 1: 转换数学公式分隔符 [ ... ] 为 \[ ... \]
-    md_content = convert_math_delimiters(md_content)
-
-    # Step 2: 使用 mdformat 格式化 Markdown 内容
-    formatted_md_content = mdformat.text(md_content, extensions={'gfm'})
-
-    # Step 3: Use the mdformat output directly.
-    final_md_content = formatted_md_content
+    final_md_content = convert_math_delimiters(md_content)
 
     # 配置Markdown扩展
     extensions = [ExtraExtension(), 'markdown.extensions.nl2br', 'markdown.extensions.tables']
