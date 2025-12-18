@@ -74,7 +74,11 @@
             <ul>
                 {% for file in files %}
                     {% set filename = file.split('/')[-1] %}
-                    <li><a href="{{ url_for('render_markdown', filename=file) }}">{{ filename | e }}</a></li>
+                    {% if file.endswith('.md') %}
+                        <li><a href="{{ url_for('render_markdown', filename=file) }}">{{ filename | e }}</a></li>
+                    {% else %}
+                        <li><a href="{{ url_for('markdown_asset_view', filename=file) }}" target="_blank">{{ filename | e }}</a></li>
+                    {% endif %}
                 {% endfor %}
             </ul>
         {% endfor %}

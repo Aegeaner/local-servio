@@ -36,16 +36,20 @@
     <div class="container">
         <h1>{{ filename }}</h1>
         <div class="media-container">
+            {% set src_url = file_url if file_url else url_for('media_file', filename=filename) %}
+            
             {% if filename.endswith('.mp4') %}
                 <video controls>
-                    <source src="{{ url_for('static', filename=filepath) }}" type="video/mp4">
+                    <source src="{{ src_url }}" type="video/mp4">
                     Your browser does not support the video tag.
                 </video>
             {% elif filename.endswith('.wav') %}
                 <audio controls>
-                    <source src="{{ url_for('static', filename=filepath) }}" type="audio/wav">
+                    <source src="{{ src_url }}" type="audio/wav">
                     Your browser does not support the audio element.
                 </audio>
+            {% elif filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')) %}
+                <img src="{{ src_url }}" style="max-width: 100%; height: auto;" alt="{{ filename }}">
             {% else %}
                 <p>Unsupported media format</p>
             {% endif %}
