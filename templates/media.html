@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ filename }} - Media Viewer</title>
     <style>
         body {
@@ -20,20 +21,45 @@
             color: #333;
             border-bottom: 1px solid #eee;
             padding-bottom: 10px;
+            word-wrap: break-word;
         }
         .media-container {
             margin-top: 20px;
             width: 100%;
+        }
+        .nav {
+            margin-bottom: 20px;
+        }
+        .nav a {
+            text-decoration: none;
+            color: #0066cc;
+            font-weight: bold;
         }
         video, audio {
             width: 100%;
             margin-top: 15px;
             border-radius: 4px;
         }
+        img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            body { margin: 10px; }
+            .container { padding: 15px; }
+            h1 { font-size: 1.5em; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="nav">
+            <a href="{{ url_for('index') }}">← Back to Home</a>
+        </div>
         <h1>{{ filename }}</h1>
         <div class="media-container">
             {% set src_url = file_url if file_url else url_for('media_file', filename=filename) %}
@@ -49,7 +75,7 @@
                     Your browser does not support the audio element.
                 </audio>
             {% elif filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')) %}
-                <img src="{{ src_url }}" style="max-width: 100%; height: auto;" alt="{{ filename }}">
+                <img src="{{ src_url }}" alt="{{ filename }}">
             {% else %}
                 <p>Unsupported media format</p>
             {% endif %}

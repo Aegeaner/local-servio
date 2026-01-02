@@ -1,14 +1,23 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Local Content Server</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
         .section { margin-bottom: 30px; }
         ul { list-style-type: none; padding: 0; }
-        li { margin: 5px 0; }
-        a { text-decoration: none; color: #0066cc; }
+        li { margin: 8px 0; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+        a { text-decoration: none; color: #0066cc; display: block; font-size: 1.1em; }
         a:hover { text-decoration: underline; }
+
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            body { margin: 10px; }
+            h1 { font-size: 1.5em; }
+            h2 { font-size: 1.3em; }
+            h3 { font-size: 1.1em; }
+        }
     </style>
 </head>
 <body>
