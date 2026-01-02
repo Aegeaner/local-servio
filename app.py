@@ -190,20 +190,34 @@ def fix_list_spacing(markdown_content: str) -> str:
 
 def convert_math_delimiters(markdown_content: str) -> str:
     r"""
-    Convert non-standard math delimiters [ ... ] to standard LaTeX delimiters \[ ... \]
-    for proper MathJax rendering.
+    Convert math delimiters to standard LaTeX delimiters for MathJax:
+    - [ ... ] -> \[ ... \] (heuristic)
+    - $$ ... $$ -> \[ ... \]
+    - $ ... $ -> \( ... \)
     """
-    pattern = r'\[\s*(.*?)\s*\]'
+    # 1. Handle [ ... ] with heuristic (existing logic)
+    bracket_pattern = r'\[\s*(.*?)\s*\]'
     
-    def replace_math(match):
+    def replace_bracket_math(match):
         math_content = match.group(1).strip()
-        # Heuristic to detect math content
         if any(char in math_content for char in ['\\', '^', '_', '{', '}', '=', '<', '>', '+', '-', '*', '/']):
             return f'\\[ {math_content} \\]'
         else:
             return match.group(0)
     
-    return re.sub(pattern, replace_math, markdown_content, flags=re.DOTALL)
+    content = re.sub(bracket_pattern, replace_bracket_math, markdown_content, flags=re.DOTALL)
+
+    # 2. Handle $$ ... $$ (Display Math)
+    # Match $$...$$ possibly spanning multiple lines. Non-greedy match.
+    # We use 4 backslashes to ensure the markdown parser receives '\[' and '\]' after escaping.
+    # Markdown converts '\\' to '\', so '\\\\[' becomes '\[' in the HTML, which MathJax recognizes.
+    content = re.sub(r'\$\$(.*?)\$\$', r'\\\\[ \1 \\\\]', content, flags=re.DOTALL)
+
+    # 3. Handle $ ... $ (Inline Math)
+    # Similarly, use 4 backslashes for inline math delimiters.
+    content = re.sub(r'\$(.*?)\$', r'\\\\( \1 \\\\)', content, flags=re.DOTALL)
+    
+    return content
 
 @app.route("/markdown/<path:filename>")
 def render_markdown(filename):
