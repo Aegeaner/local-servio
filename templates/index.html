@@ -4,7 +4,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Local Content Server</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 20px;
+            line-height: 1.6; 
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
         .section { margin-bottom: 30px; }
         ul { list-style-type: none; padding: 0; }
         li { margin: 8px 0; border-bottom: 1px solid #eee; padding-bottom: 8px; }
@@ -13,7 +27,8 @@
 
         /* Responsive adjustments */
         @media (max-width: 600px) {
-            body { margin: 10px; }
+            body { padding: 10px; }
+            .container { padding: 15px; }
             h1 { font-size: 1.5em; }
             h2 { font-size: 1.3em; }
             h3 { font-size: 1.1em; }
@@ -21,15 +36,55 @@
     </style>
 </head>
 <body>
-    <h1>Local Content Server</h1>
-    
-    <div class="section">
-        <h2>Media Files</h2>
+    <div class="container">
+        <h1>Local Content Server</h1>
+        
+        <div class="section">
+            <h2>Media Files</h2>
+                {% set grouped_files = {} %}
+                {% for file in media_files %}
+                    {% set parts = file.split('/') %}
+                    {% if parts|length > 1 %}
+                        {% set dir = parts | join('/') %}
+                    {% else %}
+                        {% set dir = 'Root Directory' %}
+                    {% endif %}
+                    {% if dir not in grouped_files %}
+                        {% set _ = grouped_files.update({dir: []}) %}
+                    {% endif %}
+                    {% set _ = grouped_files[dir].append(file) %}
+                {% endfor %}
+
+                {% set unique_display_dirs = [] %}
+                {% for dir in grouped_files.keys() %}
+                    {% set display_dir = dir.split('/')[:2] | join('/') %}
+                    {% if display_dir not in unique_display_dirs %}
+                        {% set _ = unique_display_dirs.append(display_dir) %}
+                    {% endif %}
+                {% endfor %}
+
+                {% for display_dir in unique_display_dirs %}
+                    <h3>{{ display_dir }}</h3>
+                    <ul>
+                        {% for original_dir, files_in_dir in grouped_files.items() %}
+                            {% if (original_dir.split('/')[:2] | join('/')) == display_dir %}
+                                {% for file in files_in_dir %}
+                                    {% set filename = file.split('/')[-1] %}
+                                    <li><a href="{{ url_for('media_view', filename=file) }}">{{ filename | e }}</a></li>
+                                {% endfor %}
+                            {% endif %}
+                        {% endfor %}
+                    </ul>
+                {% endfor %}
+        </div>
+        
+        <div class="section">
+            <h2>Markdown Documents</h2>
             {% set grouped_files = {} %}
-            {% for file in media_files %}
+            {% for file in markdown_files %}
                 {% set parts = file.split('/') %}
                 {% if parts|length > 1 %}
-                    {% set dir = parts | join('/') %}
+                    {% set dir = parts[0] %}
                 {% else %}
                     {% set dir = 'Root Directory' %}
                 {% endif %}
@@ -38,59 +93,21 @@
                 {% endif %}
                 {% set _ = grouped_files[dir].append(file) %}
             {% endfor %}
-
-            {% set unique_display_dirs = [] %}
-            {% for dir in grouped_files.keys() %}
-                {% set display_dir = dir.split('/')[:2] | join('/') %}
-                {% if display_dir not in unique_display_dirs %}
-                    {% set _ = unique_display_dirs.append(display_dir) %}
-                {% endif %}
-            {% endfor %}
-
-            {% for display_dir in unique_display_dirs %}
-                <h3>{{ display_dir }}</h3>
+            
+            {% for dir, files in grouped_files.items() %}
+                <h3>{{ dir }}</h3>
                 <ul>
-                    {% for original_dir, files_in_dir in grouped_files.items() %}
-                        {% if (original_dir.split('/')[:2] | join('/')) == display_dir %}
-                            {% for file in files_in_dir %}
-                                {% set filename = file.split('/')[-1] %}
-                                <li><a href="{{ url_for('media_view', filename=file) }}">{{ filename | e }}</a></li>
-                            {% endfor %}
+                    {% for file in files %}
+                        {% set filename = file.split('/')[-1] %}
+                        {% if file.endswith('.md') %}
+                            <li><a href="{{ url_for('render_markdown', filename=file) }}">{{ filename | e }}</a></li>
+                        {% else %}
+                            <li><a href="{{ url_for('markdown_asset_view', filename=file) }}" target="_blank">{{ filename | e }}</a></li>
                         {% endif %}
                     {% endfor %}
                 </ul>
             {% endfor %}
-    </div>
-    
-    <div class="section">
-        <h2>Markdown Documents</h2>
-        {% set grouped_files = {} %}
-        {% for file in markdown_files %}
-            {% set parts = file.split('/') %}
-            {% if parts|length > 1 %}
-                {% set dir = parts[0] %}
-            {% else %}
-                {% set dir = 'Root Directory' %}
-            {% endif %}
-            {% if dir not in grouped_files %}
-                {% set _ = grouped_files.update({dir: []}) %}
-            {% endif %}
-            {% set _ = grouped_files[dir].append(file) %}
-        {% endfor %}
-        
-        {% for dir, files in grouped_files.items() %}
-            <h3>{{ dir }}</h3>
-            <ul>
-                {% for file in files %}
-                    {% set filename = file.split('/')[-1] %}
-                    {% if file.endswith('.md') %}
-                        <li><a href="{{ url_for('render_markdown', filename=file) }}">{{ filename | e }}</a></li>
-                    {% else %}
-                        <li><a href="{{ url_for('markdown_asset_view', filename=file) }}" target="_blank">{{ filename | e }}</a></li>
-                    {% endif %}
-                {% endfor %}
-            </ul>
-        {% endfor %}
+        </div>
     </div>
 </body>
 </html>
