@@ -168,6 +168,26 @@ def markdown_asset_view(filename):
         "media.html", filename=normalized_filename, file_url=file_url
     )
 
+def fix_list_spacing(markdown_content: str) -> str:
+    """
+    Ensure there is a blank line before list items if preceded by a non-blank line.
+    This helps the markdown parser correctly identify lists even when they are 
+    immediately preceded by text (common with nl2br extension).
+    """
+    # Match lines starting with bullet (*, -, +) or numbered list (1.) followed by space
+    list_item_pattern = re.compile(r'^(\s*([*+-]|\d+\.)\s+)')
+    
+    lines = markdown_content.split('\n')
+    new_lines = []
+    for i, line in enumerate(lines):
+        if i > 0 and list_item_pattern.match(line):
+            prev_line = lines[i-1].strip()
+            # If previous line is not empty and doesn't look like a list item itself
+            if prev_line and not list_item_pattern.match(lines[i-1]):
+                new_lines.append('')
+        new_lines.append(line)
+    return '\n'.join(new_lines)
+
 def convert_math_delimiters(markdown_content: str) -> str:
     r"""
     Convert non-standard math delimiters [ ... ] to standard LaTeX delimiters \[ ... \]
@@ -193,6 +213,7 @@ def render_markdown(filename):
     with open(filepath, "r", encoding="utf-8") as f:
         md_content = f.read()
 
+    md_content = fix_list_spacing(md_content)
     final_md_content = convert_math_delimiters(md_content)
 
     extensions = [
