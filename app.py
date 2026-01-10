@@ -5,6 +5,7 @@ from markdown.extensions.extra import ExtraExtension
 import urllib.parse
 import re
 import logging
+import uuid
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -188,36 +189,71 @@ def fix_list_spacing(markdown_content: str) -> str:
         new_lines.append(line)
     return '\n'.join(new_lines)
 
-def convert_math_delimiters(markdown_content: str) -> str:
-    r"""
-    Convert math delimiters to standard LaTeX delimiters for MathJax:
-    - [ ... ] -> \[ ... \] (heuristic)
-    - $$ ... $$ -> \[ ... \]
-    - $ ... $ -> \( ... \)
+def fix_math_content(content):
     """
-    # 1. Handle [ ... ] with heuristic (existing logic)
-    bracket_pattern = r'\[\s*(.*?)\s*\]'
+    Fix common LaTeX errors in math content.
+    - Remove newlines to prevent markdown.extensions.nl2br from inserting <br> inside math.
+    - Double subscripts: _a_b -> _{a}_{b} or _{a_b} depending on intent, 
+      here we simply brace single alphanumeric subscripts to be safe: _x -> _{x}.
+      This turns x_i_j into x_{i}_{j} which MathJax handles correctly.
+    """
+    content = content.replace('\n', ' ')
+    return re.sub(r'_([a-zA-Z0-9]+)', r'_{\1}', content)
+
+def process_math_pre_markdown(text):
+    """
+    Extract math content, fix it, and replace with placeholders to protect from Markdown processing.
+    Returns: (text_with_placeholders, placeholders_dict)
+    """
+    placeholders = {}
     
+    def store_math(content, is_display, delimiter_type='dollar'):
+        # Apply fixes (remove newlines, fix subscripts)
+        fixed_content = fix_math_content(content)
+        
+        # Create unique placeholder
+        key = f"MATHPLACEHOLDER{uuid.uuid4().hex}ENDMATHPLACEHOLDER"
+        
+        # Wrap in appropriate delimiters for final output
+        if delimiter_type == 'bracket':
+            final_math = fr'\[ {fixed_content} \]'
+        elif is_display:
+            final_math = fr'$$ {fixed_content} $$'
+        else:
+            final_math = fr'$ {fixed_content} $'
+            
+        placeholders[key] = final_math
+        return key
+
+    # 1. Handle [ ... ] with heuristic -> Display Math (\[ ... \])
+    bracket_pattern = r'\[\s*(.*?)\s*\]'
     def replace_bracket_math(match):
         math_content = match.group(1).strip()
+        # Heuristic to distinguish math from markdown links/text
         if any(char in math_content for char in ['\\', '^', '_', '{', '}', '=', '<', '>', '+', '-', '*', '/']):
-            return f'\\[ {math_content} \\]'
+            return store_math(math_content, True, delimiter_type='bracket')
         else:
             return match.group(0)
     
-    content = re.sub(bracket_pattern, replace_bracket_math, markdown_content, flags=re.DOTALL)
+    text = re.sub(bracket_pattern, replace_bracket_math, text, flags=re.DOTALL)
 
-    # 2. Handle $$ ... $$ (Display Math)
-    # Match $$...$$ possibly spanning multiple lines. Non-greedy match.
-    # We use 4 backslashes to ensure the markdown parser receives '\[' and '\]' after escaping.
-    # Markdown converts '\\' to '\', so '\\\\[' becomes '\[' in the HTML, which MathJax recognizes.
-    content = re.sub(r'\$\$(.*?)\$\$', r'\\\\[ \1 \\\\]', content, flags=re.DOTALL)
+    # 2. Handle $$ ... $$ -> Display Math
+    text = re.sub(r'\$\$(.*?)\$\$', 
+                  lambda m: store_math(m.group(1), True, delimiter_type='dollar'), 
+                  text, flags=re.DOTALL)
 
-    # 3. Handle $ ... $ (Inline Math)
-    # Similarly, use 4 backslashes for inline math delimiters.
-    content = re.sub(r'\$(.*?)\$', r'\\\\( \1 \\\\)', content, flags=re.DOTALL)
-    
-    return content
+    # 3. Handle $ ... $ -> Inline Math
+    text = re.sub(r'\$(.*?)\$', 
+                  lambda m: store_math(m.group(1), False, delimiter_type='dollar'), 
+                  text, flags=re.DOTALL)
+                  
+    return text, placeholders
+
+def restore_math(html, placeholders):
+    """Restore math content from placeholders."""
+    for key, val in placeholders.items():
+        html = html.replace(key, val)
+    return html
 
 @app.route("/markdown/<path:filename>")
 def render_markdown(filename):
@@ -228,7 +264,9 @@ def render_markdown(filename):
         md_content = f.read()
 
     md_content = fix_list_spacing(md_content)
-    final_md_content = convert_math_delimiters(md_content)
+    
+    # Pre-process math to protect it from Markdown
+    final_md_content, math_placeholders = process_math_pre_markdown(md_content)
 
     extensions = [
         ExtraExtension(),
@@ -238,6 +276,9 @@ def render_markdown(filename):
 
     md = markdown.Markdown(extensions=extensions)
     html_content = md.convert(final_md_content)
+    
+    # Restore math content
+    html_content = restore_math(html_content, math_placeholders)
 
     return render_template(
         "markdown.html", 
