@@ -225,7 +225,19 @@ def process_math_pre_markdown(text):
         placeholders[key] = final_math
         return key
 
-    # 1. Handle [ ... ] with heuristic -> Display Math (\[ ... \])
+    # 1. Handle $$ ... $$ -> Display Math
+    # (Processed first to avoid conflict with inline math or brackets)
+    text = re.sub(r'\$\$(.*?)\$\$', 
+                  lambda m: store_math(m.group(1), True, delimiter_type='dollar'), 
+                  text, flags=re.DOTALL)
+
+    # 2. Handle $ ... $ -> Inline Math
+    text = re.sub(r'\$(.*?)\$', 
+                  lambda m: store_math(m.group(1), False, delimiter_type='dollar'), 
+                  text, flags=re.DOTALL)
+
+    # 3. Handle [ ... ] with heuristic -> Display Math (\[ ... \])
+    # (Processed last as a fallback/heuristic)
     bracket_pattern = r'\[\s*(.*?)\s*\]'
     def replace_bracket_math(match):
         math_content = match.group(1).strip()
@@ -236,16 +248,6 @@ def process_math_pre_markdown(text):
             return match.group(0)
     
     text = re.sub(bracket_pattern, replace_bracket_math, text, flags=re.DOTALL)
-
-    # 2. Handle $$ ... $$ -> Display Math
-    text = re.sub(r'\$\$(.*?)\$\$', 
-                  lambda m: store_math(m.group(1), True, delimiter_type='dollar'), 
-                  text, flags=re.DOTALL)
-
-    # 3. Handle $ ... $ -> Inline Math
-    text = re.sub(r'\$(.*?)\$', 
-                  lambda m: store_math(m.group(1), False, delimiter_type='dollar'), 
-                  text, flags=re.DOTALL)
                   
     return text, placeholders
 
