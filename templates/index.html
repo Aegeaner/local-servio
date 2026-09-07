@@ -45,7 +45,7 @@
                 {% for file in media_files %}
                     {% set parts = file.split('/') %}
                     {% if parts|length > 1 %}
-                        {% set dir = parts | join('/') %}
+                        {% set dir = parts[:-1] | join('/') %}
                     {% else %}
                         {% set dir = 'Root Directory' %}
                     {% endif %}

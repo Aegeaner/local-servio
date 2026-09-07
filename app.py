@@ -16,7 +16,8 @@ class Config:
     MARKDOWN_FOLDER = "static/markdown"
     HISTORY_RETENTION = 7
     # Extensions configuration
-    MEDIA_EXTENSIONS = [".wav", ".mp4"]
+    MEDIA_EXTENSIONS = [".wav", ".mp4", ".mp3"]
+    AUDIO_EXTENSIONS = [".wav", ".mp3"]
     IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".gif"]
     MARKDOWN_EXTENSIONS = [".md"]
 
@@ -47,7 +48,7 @@ def get_files(directory, extensions=None):
         cur_files = []
         for filename in filenames:
             if extensions:
-                if not any(filename.endswith(ext) for ext in extensions):
+                if not any(filename.lower().endswith(ext.lower()) for ext in extensions):
                     continue
             rel_path = os.path.relpath(os.path.join(root, filename), directory)
             cur_files.append(rel_path)
@@ -106,8 +107,8 @@ def get_safe_path(directory_config_key, filename):
 def index():
     media_files = get_files(app.config["UPLOAD_FOLDER"], extensions=app.config["MEDIA_EXTENSIONS"])
     
-    # Fetch both Markdown and Images from the Markdown folder
-    mixed_extensions = app.config["MARKDOWN_EXTENSIONS"] + app.config["IMAGE_EXTENSIONS"]
+    # Fetch Markdown, Images, and Audio from the Markdown folder
+    mixed_extensions = app.config["MARKDOWN_EXTENSIONS"] + app.config["IMAGE_EXTENSIONS"] + app.config["AUDIO_EXTENSIONS"]
     markdown_files = get_files(app.config["MARKDOWN_FOLDER"], extensions=mixed_extensions)
 
     return render_template(
