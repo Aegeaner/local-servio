@@ -71,28 +71,54 @@ def _fix_list_spacing(content: str) -> str:
     return "\n".join(fixed)
 
 
+_TEXT_COMMAND_RE = re.compile(
+    r"(?P<cmd>\\(?:text|textrm|textnormal|mbox))\{(?P<body>[^{}]*)\}"
+)
+
+
 def _fix_math_content(content: str) -> str:
     """Normalise a math fragment for MathJax.
 
     - Collapse newlines to spaces (so nl2br never injects ``<br>`` into math).
     - Brace bare alphanumeric subscripts (``_a`` -> ``_{a}``) without touching
       escaped underscores (``\\_``).
+    - Inside text-mode commands MathJax prints ``\\_`` as a literal backslash
+      (math mode handles it correctly), whereas a bare ``_`` is already
+      literal there. So replace ``\\_`` with ``_`` in those bodies and keep
+      them out of the subscript pass.
     """
     content = content.replace("\n", " ")
+
+    protected: dict[str, str] = {}
+
+    def protect_text(match: re.Match) -> str:
+        key = f"\x00{len(protected)}\x00"
+        body = match.group("body").replace("\\_", "_")
+        protected[key] = f"{match.group('cmd')}{{{body}}}"
+        return key
+
+    content = _TEXT_COMMAND_RE.sub(protect_text, content)
     content = re.sub(r"(?<!\\)_([a-zA-Z0-9]+)", r"_{\1}", content)
+    for key, value in protected.items():
+        content = content.replace(key, value)
     return content.strip()
 
 
 def _process_math(text: str) -> tuple[str, dict[str, str]]:
     """Extract math into placeholders so Markdown never touches it.
 
-    Explicit delimiters (``$$``, ``\\[``, ``\\(``, ``$``) are handled first;
-    a bare ``[...]`` heuristic runs last as a fallback.
+    Only explicit delimiters (``$$``, ``\\[``, ``\\(``, ``$``) are treated as
+    math. Bare ``[...]`` is left alone because it is far more often an array
+    index or array literal (e.g. ``nums[i..n - 1]``, ``[2, -1, 3]``) than a
+    formula.
     """
     placeholders: dict[str, str] = {}
 
     def store(content: str, is_display: bool, delimiter: str = "dollar") -> str:
-        fixed = _fix_math_content(content)
+        # Escape HTML metacharacters so the browser parses the math as text
+        # (e.g. ``<`` in ``|S(i,j)-goal|<k`` would otherwise start a tag).
+        # MathJax reads the resolved text content, so it still sees ``<``/``&``.
+        fixed = escape(_fix_math_content(content), quote=False)
         key = uuid.uuid4().hex
 
         if delimiter == "bracket":
@@ -126,18 +152,6 @@ def _process_math(text: str) -> tuple[str, dict[str, str]]:
         r"\$(.*?)\$", lambda m: store(m.group(1), False), text, flags=re.DOTALL
     )
 
-    bracket_pattern = r"\[\s*(.*?)\s*\]"
-
-    def replace_bracket_math(match: re.Match) -> str:
-        content = match.group(1).strip()
-        if any(
-            char in content
-            for char in ["\\", "^", "_", "{", "}", "=", "<", ">", "+", "-", "*", "/"]
-        ):
-            return store(content, True, delimiter="bracket")
-        return match.group(0)
-
-    text = re.sub(bracket_pattern, replace_bracket_math, text, flags=re.DOTALL)
     return text, placeholders
 
 
