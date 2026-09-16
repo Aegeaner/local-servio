@@ -3,6 +3,7 @@ import uuid
 from html import escape
 
 from markdown import Markdown
+from markdown.blockprocessors import OListProcessor
 from markdown.extensions.extra import ExtraExtension
 
 # ---------------------------------------------------------------------------
@@ -20,17 +21,38 @@ _FENCED_CODE_RE = re.compile(
 )
 _INLINE_CODE_RE = re.compile(r"(`+)(.*?)\1", re.DOTALL)
 
+_TAB_LENGTH = 4
 _LIST_ITEM_RE = re.compile(r"^(\s*([*+-]|\d+\.)\s+)")
+_LIST_MARKER_RE = re.compile(
+    r"^(?P<indent>[ \t]*)(?P<marker>[*+-]|\d+\.)(?P<gap>\s+)(?P<body>.*)$"
+)
+
+
+class _OrderedListProcessor(OListProcessor):
+    """Keep the number an ordered list starts at.
+
+    Python-Markdown is "lazy" by default: every ordered list starts at 1, so a
+    list resumed after an interrupted block (for example a display equation at
+    column zero) restarts its numbering. ``sane_lists`` fixes this by setting
+    ``LAZY_OL = False``; we only borrow that behaviour and leave the rest of
+    the list parsing untouched.
+    """
+
+    LAZY_OL = False
 
 
 def _make_markdown() -> Markdown:
-    return Markdown(
+    md = Markdown(
         extensions=[
             ExtraExtension(),
             "markdown.extensions.nl2br",
             "markdown.extensions.tables",
         ]
     )
+    md.parser.blockprocessors.register(
+        _OrderedListProcessor(md.parser), "olist", 40
+    )
+    return md
 
 
 def _extract_fenced_code(text: str) -> tuple[str, dict[str, str]]:
@@ -56,13 +78,28 @@ def _extract_inline_code(text: str) -> tuple[str, dict[str, str]]:
 
 
 def _fix_list_spacing(content: str) -> str:
-    """Insert a blank line before list items following a non-list line.
+    """Normalise list formatting before Markdown parsing.
 
-    The nl2br extension can otherwise cause lists to be parsed as paragraphs.
+    - Snap nested list markers to a multiple of the tab length. Generated
+      Markdown often indents nested items by only two or three spaces, which
+      Python-Markdown does not treat as nesting (``INDENT_RE`` needs at least
+      ``tab_length`` spaces), so the items are folded into the parent list and
+      appear as extra siblings instead of sub-items.
+    - Insert a blank line before list items following a non-list line. The
+      nl2br extension can otherwise cause lists to be parsed as paragraphs.
     """
     lines = content.split("\n")
     fixed: list[str] = []
     for i, line in enumerate(lines):
+        marker = _LIST_MARKER_RE.match(line)
+        if marker and marker.group("indent"):
+            depth = (len(marker.group("indent")) - 1) // _TAB_LENGTH + 1
+            line = (
+                " " * (depth * _TAB_LENGTH)
+                + marker.group("marker")
+                + marker.group("gap")
+                + marker.group("body")
+            )
         if i > 0 and _LIST_ITEM_RE.match(line):
             previous = lines[i - 1].strip()
             if previous and not _LIST_ITEM_RE.match(lines[i - 1]):
