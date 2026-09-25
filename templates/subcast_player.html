@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ entry.title }} - Subcast</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --surface: #181b22;
+            --surface-strong: #12141a;
+            --line: #262c38;
+            --text: #e8eaf0;
+            --muted: #9aa3b2;
+            --accent: #7fb2ff;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: var(--surface-strong);
+            color: var(--text);
+        }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .nav { margin-bottom: 12px; }
+        .nav a { color: var(--accent); text-decoration: none; margin-right: 16px; }
+        .nav a:hover { text-decoration: underline; }
+        h1 { font-size: 1.35em; margin: 0 0 6px; line-height: 1.4; }
+        .meta { color: var(--muted); font-size: 0.85em; margin-bottom: 16px; }
+        .meta span { margin-right: 6px; }
+
+        /* The stage is a column: media surface first, caption lane below it. The
+           lane is part of the layout instead of an overlay, so a tall cue can
+           never be clipped by the media surface or hidden behind the controls. */
+        .stage { display: flex; flex-direction: column; gap: 10px; }
+        .screen {
+            display: flex;
+            align-items: center;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .screen.audio { padding: 18px 14px; background: var(--surface); }
+        video, audio { display: block; width: 100%; }
+        video { max-height: 72vh; }
+
+        .captions {
+            min-height: 3.2em; /* two lines of room, so playback never reflows the page */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 14px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            font-size: clamp(16px, 2.2vw, 26px);
+            line-height: 1.4;
+            text-align: center;
+            white-space: pre-line;
+            overflow-wrap: anywhere;
+        }
+        .captions.idle { color: var(--muted); }
+        .captions.idle::before { content: "No captions at this point."; font-size: 0.65em; opacity: 0.75; }
+
+        .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+        button {
+            background: #242a36;
+            color: var(--text);
+            border: 1px solid #333c4d;
+            border-radius: 8px;
+            padding: 0.5em 1em;
+            font: inherit;
+            font-size: 0.9em;
+            cursor: pointer;
+        }
+        button:hover:not(:disabled) { background: #2e3646; }
+        button:disabled { opacity: 0.45; cursor: default; }
+        button[aria-pressed="true"] { border-color: #5b8def; color: #a9c6ff; }
+        .hint { color: #7d879a; font-size: 0.8em; margin-top: 14px; }
+        .source { color: #6b7486; font-size: 0.78em; margin-top: 18px; overflow-wrap: anywhere; }
+
+        /* Fullscreen keeps the caption lane inside the fullscreen element. */
+        .stage:fullscreen {
+            gap: 0;
+            padding: 0;
+            background: #000;
+            height: 100%;
+        }
+        .stage:fullscreen .screen { flex: 1; min-height: 0; border-radius: 0; }
+        .stage:fullscreen video { height: 100%; max-height: none; object-fit: contain; }
+        .stage:fullscreen .captions {
+            border: 0;
+            border-radius: 0;
+            background: #000;
+            min-height: 4.5em;
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            h1 { font-size: 1.15em; }
+            .captions { min-height: 3.4em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <a href="{{ url_for('subcast_index') }}">← Subcast cache</a><a href="{{ url_for('index') }}">Home</a>
+        </div>
+
+        <h1>{{ entry.title }}</h1>
+        <div class="meta">
+            <span>{{ 'Video' if entry.is_video else 'Audio' }}</span>
+            <span>{{ entry.source }}</span>
+            {% if entry.duration_text %}<span>{{ entry.duration_text }}</span>{% endif %}
+            <span>{{ entry.size | filesizeformat }}</span>
+        </div>
+
+        <div class="stage" id="stage">
+            <div class="screen {{ 'video' if entry.is_video else 'audio' }}" id="screen">
+                {% if entry.is_video %}
+                <video id="media" controls playsinline preload="metadata">
+                {% else %}
+                <audio id="media" controls preload="metadata">
+                {% endif %}
+                    <source src="{{ media_url }}" type="{{ mimetype }}">
+                    {% if subtitles_url %}
+                    <track id="subtitles" kind="subtitles" srclang="en" label="Subtitles" src="{{ subtitles_url }}" default>
+                    {% endif %}
+                    Your browser does not support HTML5 media playback.
+                {% if entry.is_video %}</video>{% else %}</audio>{% endif %}
+            </div>
+            {% if subtitles_url %}
+            <div class="captions idle" id="captions"><span id="cue-text"></span></div>
+            {% endif %}
+        </div>
+
+        <div class="controls">
+            <button id="toggle-captions" type="button" aria-pressed="{{ 'true' if subtitles_url else 'false' }}"
+                    {% if not subtitles_url %}disabled title="No transcript cached for this file"{% endif %}>Captions</button>
+            <button id="toggle-fullscreen" type="button">Fullscreen</button>
+        </div>
+        <p class="hint">Space play/pause · ←/→ 5s · ↑/↓ volume · C captions · F fullscreen</p>
+        <p class="source">{{ entry.filename }}</p>
+    </div>
+
+    <script>
+        (() => {
+            "use strict";
+
+            const SEEK_STEP = 5;
+            const media = document.getElementById("media");
+            const stage = document.getElementById("stage");
+            const trackElement = document.getElementById("subtitles");
+            const captions = document.getElementById("captions");
+            const cueText = document.getElementById("cue-text");
+            const captionsButton = document.getElementById("toggle-captions");
+            const fullscreenButton = document.getElementById("toggle-fullscreen");
+
+            // Cues are painted from the media clock (TextTrack.activeCues) rather
+            // than the element's own renderer: an <audio> element has no surface
+            // for native cue rendering, and driving both from activeCues keeps the
+            // text in step with the timeline instead of with wall-clock timers.
+            const track = trackElement ? trackElement.track : null;
+            let captionsOn = Boolean(track);
+            let frame = 0;
+
+            if (track) {
+                track.mode = "hidden";
+            }
+
+            function paint() {
+                if (!captions || !cueText) {
+                    return;
+                }
+                if (!track || !captionsOn) {
+                    cueText.textContent = "";
+                    captions.classList.add("idle");
+                    return;
+                }
+
+                const active = track.activeCues;
+                cueText.textContent = "";
+                if (active && active.length > 0) {
+                    Array.from(active).forEach((cue, index) => {
+                        if (index > 0) {
+                            cueText.appendChild(document.createElement("br"));
+                        }
+                        cueText.appendChild(
+                            cue.getCueAsHTML ? cue.getCueAsHTML() : document.createTextNode(cue.text)
+                        );
+                    });
+                }
+                captions.classList.toggle("idle", cueText.textContent === "");
+            }
+
+            // Follow the media clock frame by frame while playing; every other
+            // repaint comes from media events, all of which are clock-relative.
+            function step() {
+                paint();
+                frame = media.paused || media.ended ? 0 : requestAnimationFrame(step);
+            }
+
+            function startPainting() {
+                if (!frame) {
+                    frame = requestAnimationFrame(step);
+                }
+            }
+
+            function stopPainting() {
+                if (frame) {
+                    cancelAnimationFrame(frame);
+                    frame = 0;
+                }
+            }
+
+            media.addEventListener("play", startPainting);
+            media.addEventListener("playing", startPainting);
+            media.addEventListener("pause", () => { stopPainting(); paint(); });
+            media.addEventListener("ended", () => { stopPainting(); paint(); });
+            media.addEventListener("seeked", paint);
+            media.addEventListener("timeupdate", paint);
+            document.addEventListener("visibilitychange", paint);
+            if (trackElement) {
+                trackElement.addEventListener("cuechange", paint);
+            }
+            if (track && typeof track.addEventListener === "function") {
+                track.addEventListener("cuechange", paint);
+            }
+            if (media.readyState > 0) {
+                paint();
+            } else {
+                media.addEventListener("loadedmetadata", paint, { once: true });
+            }
+
+            function toggleCaptions() {
+                if (!track) {
+                    return;
+                }
+                captionsOn = !captionsOn;
+                track.mode = captionsOn ? "hidden" : "disabled";
+                captionsButton.setAttribute("aria-pressed", String(captionsOn));
+                paint();
+            }
+
+            captionsButton.addEventListener("click", toggleCaptions);
+
+            fullscreenButton.addEventListener("click", () => {
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                } else if (stage.requestFullscreen) {
+                    stage.requestFullscreen();
+                }
+            });
+
+            document.addEventListener("fullscreenchange", () => {
+                fullscreenButton.textContent = document.fullscreenElement
+                    ? "Exit fullscreen"
+                    : "Fullscreen";
+            });
+
+            function togglePlayback() {
+                const attempt = media.paused ? media.play() : media.pause();
+                if (attempt && typeof attempt.catch === "function") {
+                    attempt.catch(() => {});
+                }
+            }
+
+            function seekBy(delta) {
+                const duration = Number.isFinite(media.duration) ? media.duration : Infinity;
+                media.currentTime = Math.min(Math.max(0, media.currentTime + delta), duration);
+            }
+
+            document.addEventListener("keydown", (event) => {
+                if (event.altKey || event.ctrlKey || event.metaKey) {
+                    return;
+                }
+                if (event.target instanceof HTMLElement && event.target.closest("input, textarea, select")) {
+                    return;
+                }
+
+                switch (event.key) {
+                    case " ":
+                    case "Spacebar":
+                        event.preventDefault();
+                        togglePlayback();
+                        break;
+                    case "ArrowLeft":
+                        event.preventDefault();
+                        seekBy(-SEEK_STEP);
+                        break;
+                    case "ArrowRight":
+                        event.preventDefault();
+                        seekBy(SEEK_STEP);
+                        break;
+                    case "ArrowUp":
+                        event.preventDefault();
+                        media.volume = Math.min(1, Math.round((media.volume + 0.05) * 100) / 100);
+                        break;
+                    case "ArrowDown":
+                        event.preventDefault();
+                        media.volume = Math.max(0, Math.round((media.volume - 0.05) * 100) / 100);
+                        break;
+                    case "c":
+                    case "C":
+                        toggleCaptions();
+                        break;
+                    case "f":
+                    case "F":
+                        fullscreenButton.click();
+                        break;
+                }
+            });
+        })();
+    </script>
+</body>
+</html>

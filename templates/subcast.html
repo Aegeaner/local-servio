@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subcast Cache</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .nav { margin-bottom: 12px; }
+        .nav a { text-decoration: none; color: #0066cc; font-weight: bold; }
+        h1 { margin: 0 0 4px; }
+        .hint { color: #666; font-size: 0.85em; margin: 0 0 20px; }
+        .hint code { background: #f0f0f0; padding: 1px 4px; border-radius: 3px; }
+        .section { margin-bottom: 28px; }
+        h2 {
+            font-size: 1.15em;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 6px;
+            margin-bottom: 10px;
+        }
+        h2 .count { color: #888; font-weight: normal; font-size: 0.85em; }
+        ul { list-style-type: none; padding: 0; margin: 0; }
+        li { margin: 0 0 10px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+        a.title {
+            text-decoration: none;
+            color: #0066cc;
+            display: block;
+            font-size: 1.05em;
+            line-height: 1.4;
+        }
+        a.title:hover { text-decoration: underline; }
+        a.title .kind {
+            display: inline-block;
+            min-width: 3.6em;
+            text-align: center;
+            font-size: 0.7em;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #fff;
+            background: #4a7dbf;
+            border-radius: 3px;
+            padding: 1px 4px;
+            margin-right: 6px;
+            vertical-align: 2px;
+        }
+        a.title .kind.video { background: #a3542a; }
+        .meta { color: #666; font-size: 0.8em; margin-top: 4px; }
+        .meta span { margin-right: 10px; }
+        .meta .key { color: #999; word-break: break-all; }
+        .badge {
+            border: 1px solid #6aa84f;
+            border-radius: 3px;
+            color: #4a7d34;
+            padding: 0 4px;
+        }
+        .badge.missing { border-color: #ccc; color: #999; }
+
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            .container { padding: 15px; }
+            h1 { font-size: 1.5em; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <a href="{{ url_for('index') }}">← Back to Home</a>
+        </div>
+        <h1>Subcast Cache</h1>
+        <p class="hint">
+            {{ total }} playable file{{ '' if total == 1 else 's' }} in
+            <code>{{ folder }}</code>
+        </p>
+
+        {% for source, entries in groups.items() %}
+            <div class="section">
+                <h2>{{ source }} <span class="count">{{ entries | length }}</span></h2>
+                <ul>
+                    {% for entry in entries %}
+                        <li>
+                            <a class="title" href="{{ url_for('subcast_player', source=entry.source, key=entry.key) }}">
+                                <span class="kind {{ 'video' if entry.is_video else 'audio' }}">{{ 'Video' if entry.is_video else 'Audio' }}</span>{{ entry.title | e }}
+                            </a>
+                            <div class="meta">
+                                {% if entry.duration_text %}<span>{{ entry.duration_text }}</span>{% endif %}
+                                <span>{{ entry.size | filesizeformat }}</span>
+                                {% if entry.has_subtitles %}
+                                    <span class="badge">Subtitles</span>
+                                {% else %}
+                                    <span class="badge missing">No subtitles</span>
+                                {% endif %}
+                                <span class="key">{{ entry.key }}</span>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% else %}
+            <p>No cached audio or video files found.</p>
+        {% endfor %}
+    </div>
+</body>
+</html>

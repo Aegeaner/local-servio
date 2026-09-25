@@ -38,7 +38,14 @@
 <body>
     <div class="container">
         <h1>Local Content Server</h1>
-        
+
+        <div class="section">
+            <h2>Subcast Cache</h2>
+            <ul>
+                <li><a href="{{ url_for('subcast_index') }}">Cached audio &amp; video with subtitles</a></li>
+            </ul>
+        </div>
+
         <div class="section">
             <h2>Media Files</h2>
                 {% set grouped_files = {} %}
