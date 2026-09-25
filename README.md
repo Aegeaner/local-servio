@@ -12,7 +12,7 @@ This is a simple Python web server built with Flask, designed for serving audio,
 | Route | Purpose |
 | --- | --- |
 | `/` | Index of uploaded media and Markdown documents |
-| `/subcast` | Cache browser for the subcast CLI's media cache, grouped by source |
+| `/subcast` | Cache browser for the subcast CLI's media cache, grouped by source; files inside a source are newest-modified first |
 | `/subcast/player/<source>/<key>` | HTML5 player: native `<video>`/`<audio>` over byte-range requests, `<track>` captions painted from `TextTrack.activeCues` into a caption lane below the player |
 | `/subcast/media/<source>/<file>` | Byte-range media streaming (`206 Partial Content`, for seeking) |
 | `/subcast/subtitles/<source>/<key>.vtt` | The cached `.srt`/`.cues.json` transcript as `text/vtt` |

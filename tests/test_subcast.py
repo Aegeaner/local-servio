@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -157,6 +158,12 @@ class CacheListingTest(unittest.TestCase):
         path.write_bytes(payload)
         return path
 
+    def set_mtime(self, relative: str, mtime: float) -> Path:
+        """Write a file with an explicit modification time (ordering fixtures)."""
+        path = self.write(relative, b"audio")
+        os.utime(path, (mtime, mtime))
+        return path
+
     def test_only_playable_media_is_listed(self):
         entries = {entry.filename for entry in subcast.list_media(self.folder)}
 
@@ -187,13 +194,23 @@ class CacheListingTest(unittest.TestCase):
 
         self.assertEqual(entries["dddd"].title, "dddd")
 
-    def test_listing_is_newest_first(self):
-        newest = self.write("acast/eeee.mp3", b"audio")
+    def test_files_are_listed_newest_first_within_each_source(self):
+        """The cache grows over time, so the newest recording has to lead its group."""
+        self.set_mtime("apple/old.mp3", 1_700_000_000)
+        self.set_mtime("apple/mid.mp3", 1_700_000_600)
+        self.set_mtime("apple/new.mp3", 1_700_001_200)
+        self.set_mtime("podcast/single.mp3", 1_699_000_000)
 
         entries = subcast.list_media(self.folder)
 
-        self.assertEqual(entries[0].filename, "acast/eeee.mp3")
-        self.assertEqual(entries[0].modified, newest.stat().st_mtime)
+        self.assertEqual(
+            [entry.key for entry in entries if entry.source == "apple"],
+            ["new", "mid", "old"],
+        )
+        # Group order follows the same key: the most recently changed source leads.
+        self.assertEqual(
+            entries[0].filename, max(entries, key=lambda e: e.modified).filename
+        )
 
     def test_missing_cache_folder_lists_nothing(self):
         self.assertEqual(subcast.list_media(self.folder / "absent"), [])

@@ -106,7 +106,13 @@ def _source_dirs(root: Path) -> list[Path]:
 
 
 def list_media(folder: str | Path) -> list[MediaEntry]:
-    """List playable files under *folder*, newest first."""
+    """List playable files under *folder*, newest first.
+
+    The whole result is ordered by modification time (descending), which is also
+    the order inside each source: grouping the entries by source keeps them
+    newest first, and the groups themselves appear with the source that changed
+    most recently at the top.
+    """
     root = Path(folder)
     if not root.is_dir():
         current_app.logger.warning("Subcast folder not found: %s", root)
