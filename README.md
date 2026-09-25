@@ -6,6 +6,7 @@ This is a simple Python web server built with Flask, designed for serving audio,
 - Markdown content serving
 - Static file hosting
 - Subcast cache browser (`/subcast`): native HTML5 playback of cached `.mp3`/`.mp4` files with WebVTT subtitles
+- Player keeps the screen awake while playing (Screen Wake Lock, where the browser has it) and falls back to the native video player fullscreen on iPadOS/iPhone
 - Poetry dependency management
 
 ## Routes

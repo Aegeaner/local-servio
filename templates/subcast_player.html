@@ -78,18 +78,25 @@
         button:disabled { opacity: 0.45; cursor: default; }
         button[aria-pressed="true"] { border-color: #5b8def; color: #a9c6ff; }
         .hint { color: #7d879a; font-size: 0.8em; margin-top: 14px; }
+        .status { color: #7d879a; font-size: 0.78em; margin-top: 8px; }
+        .status.warn { color: #d9a441; }
         .source { color: #6b7486; font-size: 0.78em; margin-top: 18px; overflow-wrap: anywhere; }
 
-        /* Fullscreen keeps the caption lane inside the fullscreen element. */
-        .stage:fullscreen {
+        /* Fullscreen keeps the caption lane inside the fullscreen element. WebKit
+           still matches the prefixed pseudo-class that Safari uses on iPadOS. */
+        .stage:fullscreen,
+        .stage:-webkit-full-screen {
             gap: 0;
             padding: 0;
             background: #000;
             height: 100%;
         }
-        .stage:fullscreen .screen { flex: 1; min-height: 0; border-radius: 0; }
-        .stage:fullscreen video { height: 100%; max-height: none; object-fit: contain; }
-        .stage:fullscreen .captions {
+        .stage:fullscreen .screen,
+        .stage:-webkit-full-screen .screen { flex: 1; min-height: 0; border-radius: 0; }
+        .stage:fullscreen video,
+        .stage:-webkit-full-screen video { height: 100%; max-height: none; object-fit: contain; }
+        .stage:fullscreen .captions,
+        .stage:-webkit-full-screen .captions {
             border: 0;
             border-radius: 0;
             background: #000;
@@ -142,6 +149,7 @@
             <button id="toggle-fullscreen" type="button">Fullscreen</button>
         </div>
         <p class="hint">Space play/pause · ←/→ 5s · ↑/↓ volume · C captions · F fullscreen</p>
+        <p class="status" id="wake-status">Screen stays awake while playing.</p>
         <p class="source">{{ entry.filename }}</p>
     </div>
 
@@ -157,6 +165,7 @@
             const cueText = document.getElementById("cue-text");
             const captionsButton = document.getElementById("toggle-captions");
             const fullscreenButton = document.getElementById("toggle-fullscreen");
+            const wakeStatus = document.getElementById("wake-status");
 
             // Cues are painted from the media clock (TextTrack.activeCues) rather
             // than the element's own renderer: an <audio> element has no surface
@@ -164,6 +173,9 @@
             // text in step with the timeline instead of with wall-clock timers.
             const track = trackElement ? trackElement.track : null;
             let captionsOn = Boolean(track);
+            // True while the cues are drawn by the browser's native player (iOS
+            // takes over a <video> in fullscreen) instead of by the lane below.
+            let nativeCues = false;
             let frame = 0;
 
             if (track) {
@@ -173,6 +185,9 @@
             function paint() {
                 if (!captions || !cueText) {
                     return;
+                }
+                if (nativeCues) {
+                    return; // the native player renders the cues in its own overlay
                 }
                 if (!track || !captionsOn) {
                     cueText.textContent = "";
@@ -215,13 +230,19 @@
                 }
             }
 
-            media.addEventListener("play", startPainting);
-            media.addEventListener("playing", startPainting);
-            media.addEventListener("pause", () => { stopPainting(); paint(); });
-            media.addEventListener("ended", () => { stopPainting(); paint(); });
+            media.addEventListener("play", () => { startPainting(); syncWakeLock(); });
+            media.addEventListener("playing", () => { startPainting(); syncWakeLock(); });
+            media.addEventListener("pause", () => { stopPainting(); paint(); syncWakeLock(); });
+            media.addEventListener("ended", () => { stopPainting(); paint(); syncWakeLock(); });
             media.addEventListener("seeked", paint);
             media.addEventListener("timeupdate", paint);
-            document.addEventListener("visibilitychange", paint);
+            document.addEventListener("visibilitychange", () => {
+                paint();
+                syncWakeLock(); // a wake lock is dropped when the page is hidden
+            });
+            // A refused wake lock is retried on the next gesture, which is when
+            // browsers are willing to hand it out again.
+            media.addEventListener("pointerup", syncWakeLock);
             if (trackElement) {
                 trackElement.addEventListener("cuechange", paint);
             }
@@ -239,26 +260,207 @@
                     return;
                 }
                 captionsOn = !captionsOn;
-                track.mode = captionsOn ? "hidden" : "disabled";
+                track.mode = captionsOn ? (nativeCues ? "showing" : "hidden") : "disabled";
                 captionsButton.setAttribute("aria-pressed", String(captionsOn));
                 paint();
             }
 
             captionsButton.addEventListener("click", toggleCaptions);
 
+            // -- Fullscreen ---------------------------------------------------
+            // Desktop browsers fullscreen the stage, which carries the caption
+            // lane. WebKit on iPadOS/iPhone has no Fullscreen API for arbitrary
+            // elements: only a <video> can go fullscreen, through the native
+            // player, and then the browser renders the cues itself.
+            function stageFullscreenRequest() {
+                return (
+                    stage.requestFullscreen ||
+                    stage.webkitRequestFullscreen ||
+                    stage.webkitRequestFullScreen
+                );
+            }
+
+            function nativeVideoFullscreen() {
+                return typeof media.webkitEnterFullscreen === "function"
+                    ? media.webkitEnterFullscreen.bind(media)
+                    : null;
+            }
+
+            function canFullscreen() {
+                return Boolean(stageFullscreenRequest() || nativeVideoFullscreen());
+            }
+
+            function fullscreenElement() {
+                return document.fullscreenElement || document.webkitFullscreenElement || null;
+            }
+
+            function isFullscreen() {
+                return Boolean(fullscreenElement() || nativeCues);
+            }
+
+            function syncFullscreenButton() {
+                const supported = canFullscreen();
+                fullscreenButton.disabled = !supported;
+                fullscreenButton.title = supported
+                    ? ""
+                    : "This browser cannot show this player fullscreen";
+                fullscreenButton.textContent = isFullscreen() ? "Exit fullscreen" : "Fullscreen";
+            }
+
+            function enterNativeVideoFullscreen() {
+                const enter = nativeVideoFullscreen();
+                if (!enter) {
+                    return; // an <audio> element has no fullscreen on WebKit
+                }
+                if (track) {
+                    track.mode = captionsOn ? "showing" : "disabled";
+                }
+                nativeCues = true;
+                enter();
+                syncFullscreenButton();
+            }
+
+            function leaveNativeFullscreen() {
+                if (nativeCues) {
+                    nativeCues = false;
+                    if (track) {
+                        track.mode = captionsOn ? "hidden" : "disabled";
+                    }
+                    paint();
+                }
+                syncFullscreenButton();
+            }
+
+            function enterFullscreen() {
+                const request = stageFullscreenRequest();
+                if (typeof request === "function") {
+                    // WebKit can refuse the element request; the native player is
+                    // then the only fullscreen an iPad is willing to give.
+                    Promise.resolve()
+                        .then(() => request.call(stage))
+                        .catch(enterNativeVideoFullscreen);
+                    return;
+                }
+                enterNativeVideoFullscreen();
+            }
+
+            function exitFullscreen() {
+                const exit =
+                    document.exitFullscreen ||
+                    document.webkitExitFullscreen ||
+                    document.webkitCancelFullScreen;
+                if (fullscreenElement() && typeof exit === "function") {
+                    const attempt = exit.call(document);
+                    if (attempt && typeof attempt.catch === "function") {
+                        attempt.catch(() => {});
+                    }
+                    return;
+                }
+                if (nativeCues) {
+                    if (typeof media.webkitExitFullscreen === "function") {
+                        media.webkitExitFullscreen();
+                    }
+                    leaveNativeFullscreen();
+                }
+            }
+
             fullscreenButton.addEventListener("click", () => {
-                if (document.fullscreenElement) {
-                    document.exitFullscreen();
-                } else if (stage.requestFullscreen) {
-                    stage.requestFullscreen();
+                if (isFullscreen()) {
+                    exitFullscreen();
+                } else {
+                    enterFullscreen();
                 }
             });
+            document.addEventListener("fullscreenchange", syncFullscreenButton);
+            document.addEventListener("webkitfullscreenchange", syncFullscreenButton);
+            media.addEventListener("webkitbeginfullscreen", syncFullscreenButton);
+            media.addEventListener("webkitendfullscreen", leaveNativeFullscreen);
+            syncFullscreenButton();
 
-            document.addEventListener("fullscreenchange", () => {
-                fullscreenButton.textContent = document.fullscreenElement
-                    ? "Exit fullscreen"
-                    : "Fullscreen";
-            });
+            // -- Screen wake lock ---------------------------------------------
+            // Phones and tablets dim the display during audio playback; the Screen
+            // Wake Lock API holds it on while the media plays. Browsers without the
+            // API (WebKit before iOS 16.4) cannot be helped from a page, so say so
+            // instead of pretending.
+            let wakeLock = null; // sentinel currently held, if any
+            let acquiring = false; // a request is in flight
+
+            function setWakeStatus(message, warn) {
+                if (!wakeStatus) {
+                    return;
+                }
+                wakeStatus.textContent = message;
+                wakeStatus.classList.toggle("warn", Boolean(warn));
+            }
+
+            function wantsWakeLock() {
+                return !media.paused && !media.ended && document.visibilityState === "visible";
+            }
+
+            function releaseSentinel(sentinel) {
+                if (!sentinel || typeof sentinel.release !== "function") {
+                    return;
+                }
+                const attempt = sentinel.release();
+                if (attempt && typeof attempt.catch === "function") {
+                    attempt.catch(() => {});
+                }
+            }
+
+            async function acquireWakeLock() {
+                // "play" and "playing" both arrive before the first request has been
+                // answered, and a second sentinel would outlive the pause that follows.
+                if (!("wakeLock" in navigator) || wakeLock || acquiring || !wantsWakeLock()) {
+                    return;
+                }
+                acquiring = true;
+                let sentinel;
+                try {
+                    sentinel = await navigator.wakeLock.request("screen");
+                } catch (error) {
+                    setWakeStatus(
+                        "The browser refused the screen wake lock; the display may dim.",
+                        true
+                    );
+                    return;
+                } finally {
+                    acquiring = false;
+                }
+
+                if (!wantsWakeLock()) {
+                    // Playback stopped while the request was in flight.
+                    releaseSentinel(sentinel);
+                    return;
+                }
+                sentinel.addEventListener("release", () => {
+                    if (wakeLock === sentinel) {
+                        wakeLock = null;
+                    }
+                });
+                wakeLock = sentinel;
+                setWakeStatus("Screen stays awake while playing.", false);
+            }
+
+            function releaseWakeLock() {
+                const sentinel = wakeLock;
+                wakeLock = null;
+                releaseSentinel(sentinel);
+            }
+
+            function syncWakeLock() {
+                if (wantsWakeLock()) {
+                    acquireWakeLock();
+                } else {
+                    releaseWakeLock();
+                }
+            }
+
+            if (!("wakeLock" in navigator)) {
+                setWakeStatus(
+                    "This browser cannot keep the screen awake during playback; the display may dim.",
+                    true
+                );
+            }
 
             function togglePlayback() {
                 const attempt = media.paused ? media.play() : media.pause();
