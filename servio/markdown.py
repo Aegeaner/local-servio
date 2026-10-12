@@ -119,18 +119,23 @@ def _fix_list_spacing(content: str) -> str:
 # because it is far more often an array index or array literal
 # (``nums[i..n - 1]``, ``[2, -1, 3]``) than a formula.
 #
-# ``$$`` has to open a line (nothing but indentation before it) and inline
-# ``$`` is confined to a single line. Without those limits a single unbalanced
-# or currency-like delimiter pairs up with a distant one and swallows every
-# paragraph in between. Lookbehinds keep LaTeX ``\\[6pt]`` row spacing and
+# ``$$`` has to open a line -- indentation and blockquote markers may precede it
+# (``> $$x$$``), since Markdown strips those before it sees the content -- and
+# inline ``$`` is confined to a single line. Without those limits a single
+# unbalanced or currency-like delimiter pairs up with a distant one and swallows
+# every paragraph in between. Lookbehinds keep LaTeX ``\\[6pt]`` row spacing and
 # escaped ``\$`` from being read as delimiters.
 # ---------------------------------------------------------------------------
 _DISPLAY_DOLLAR_RE = re.compile(
-    r"(?m)^(?P<indent>[ \t]*)(?<!\\)\$\$(?!\$)(?P<body>.*?)(?<!\\)\$\$(?!\$)",
+    r"(?m)^(?P<prefix>[ \t]*(?:>[ \t]?)*)(?<!\\)\$\$(?!\$)(?P<body>.*?)(?<!\\)\$\$(?!\$)",
     re.DOTALL,
 )
 _DISPLAY_BRACKET_RE = re.compile(r"(?<!\\)\\\[(?P<body>.*?)(?<!\\)\\\]", re.DOTALL)
 _INLINE_PAREN_RE = re.compile(r"(?<!\\)\\\((?P<body>.*?)(?<!\\)\\\)", re.DOTALL)
+# Markdown blockquote markers, including nesting (``> > x``), that open a line
+# other than the first one: the markers of the opening ``$$`` line are part of
+# the match's prefix group instead.
+_BLOCKQUOTE_MARKER_RE = re.compile(r"(?<=\n)[ \t]*(?:>[ \t]?)+")
 _INLINE_DOLLAR_RE = re.compile(
     r"(?<![\\$])\$(?!\$)(?P<body>[^\n$]*[^\s$][^\n$]*)\$(?!\$)"
 )
@@ -202,10 +207,16 @@ def _process_math(text: str) -> tuple[str, dict[str, str]]:
         return _MATH_PLACEHOLDER.format(key)
 
     def replace_display_dollar(match: re.Match) -> str:
-        # Keep the indentation: display math inside a list item has to stay
-        # indented, otherwise the placeholder drops out of the list.
-        token = store(match.group("body"), display=True)
-        return match.group("indent") + token
+        # Keep the indentation and blockquote markers: display math inside a
+        # list item or a blockquote has to stay inside it, otherwise the
+        # placeholder drops out of the container. Those markers only precede
+        # the opening ``$$``; on the continuation lines they are part of the
+        # captured body, so strip them there.
+        prefix = match.group("prefix")
+        body = match.group("body")
+        if ">" in prefix:
+            body = _BLOCKQUOTE_MARKER_RE.sub("", body)
+        return prefix + store(body, display=True)
 
     text = _DISPLAY_DOLLAR_RE.sub(replace_display_dollar, text)
     text = _DISPLAY_BRACKET_RE.sub(

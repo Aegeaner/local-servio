@@ -75,6 +75,29 @@ class MathExtractionTest(unittest.TestCase):
         self.assertEqual(html.count("<li>"), 2)
         self.assertIn("$$ a=b $$", html)
 
+    def test_display_math_inside_a_blockquote_survives_markdown_escaping(self):
+        # The report that started this: a ``$$`` line inside a quote used to
+        # miss the extraction, so Markdown ate the backslash of ``\#`` and
+        # MathJax failed with "macro parameter character #".
+        source = "> 因此新增的逆序对数量是：\n> $$c(a,b)=\\#\\{(i,j)\\ :\\ i\\in S_a\\}$$\n"
+
+        html = render_markdown(source)
+
+        self.assertNotIn("MATHPLACEHOLDER", html)
+        self.assertEqual(html.count("$$"), 2)
+        self.assertIn("$$ c(a,b)=\\#\\{(i,j)\\ :\\ i\\in S_a\\} $$", html)
+        self.assertTrue(html.index("$$") > html.index("<blockquote>"))
+        self.assertTrue(html.index("$$", html.index("$$") + 1) < html.index("</blockquote>"))
+
+    def test_quoted_display_math_drops_the_markers_of_its_own_lines(self):
+        source = "> 化简得：\n> $$\n> a &= b.\\\\\n> c &= d.\n> $$\n\n后文。\n"
+
+        html = render_markdown(source)
+
+        self.assertNotIn("MATHPLACEHOLDER", html)
+        self.assertIn("$$ a &amp;= b.\\\\ c &amp;= d. $$", html)
+        self.assertNotIn("> a", html)
+
     def test_math_in_table_cells_does_not_break_the_table(self):
         html = render_markdown("| 公式 |\n|---|\n| $|x|$ |\n")
 
