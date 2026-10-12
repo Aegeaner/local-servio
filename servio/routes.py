@@ -33,7 +33,6 @@ def register_routes(app: Flask) -> None:
             "index.html",
             media_files=media_files,
             markdown_files=markdown_files,
-            media_view_route="media_view",
         )
 
     @app.route("/media/<path:filename>")

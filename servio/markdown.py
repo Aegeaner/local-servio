@@ -23,9 +23,6 @@ _FENCED_CODE_RE = re.compile(
 )
 _INLINE_CODE_RE = re.compile(r"(`+)(.*?)\1", re.DOTALL)
 _ESCAPED_DOLLAR_RE = re.compile(r"\\\$")
-_ESCAPED_DOLLAR_TOKEN_RE = re.compile(
-    _ESCAPED_DOLLAR_PLACEHOLDER.format(r"[0-9a-f]{32}")
-)
 
 _TAB_LENGTH = 4
 _LIST_ITEM_RE = re.compile(r"^(\s*([*+-]|\d+\.)\s+)")

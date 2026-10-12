@@ -6,9 +6,8 @@ from servio.markdown import render_markdown
 class MathExtractionTest(unittest.TestCase):
     """Math must be pulled out of the Markdown stream without damaging it.
 
-    Every case here is a shape that real generated documents use (see
-    ``static/markdown/20260924/210230_什么是LL(1) 文法.md``, where an escaped
-    dollar used to re-partition the whole answer).
+    Every case here is a shape that real generated documents use; the escaped
+    dollar in the first test, for example, used to re-partition a whole answer.
     """
 
     def test_escaped_dollar_stays_inside_its_math_span(self):

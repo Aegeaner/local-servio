@@ -125,7 +125,7 @@
         </div>
 
         <div class="stage" id="stage">
-            <div class="screen {{ 'video' if entry.is_video else 'audio' }}" id="screen">
+            <div class="screen {{ 'video' if entry.is_video else 'audio' }}">
                 {% if entry.is_video %}
                 <video id="media" controls playsinline preload="metadata">
                 {% else %}
